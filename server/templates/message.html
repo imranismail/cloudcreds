@@ -1,0 +1,16 @@
+<html>
+  <head>
+    <title>Cloud Credentials | Error</title>
+    <link href="https://unpkg.com/tailwindcss@^1.0/dist/tailwind.min.css" rel="stylesheet">
+  </head>
+  <body class="bg-gray-200">
+    <main class="flex justify-center">
+      <div class="text-center mt-12">
+        <div class="p-2 bg-{{index . "color"}}-800 items-center text-{{index . "color"}}-100 leading-none lg:rounded-full flex lg:inline-flex" role="alert">
+          <span class="flex rounded-full bg-{{index . "color"}}-500 uppercase px-2 py-1 text-xs font-bold mr-3">{{index . "context"}}</span>
+          <span class="font-semibold mr-2 text-left flex-auto">{{index . "message"}}</span>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
