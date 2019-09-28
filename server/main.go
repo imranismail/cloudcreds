@@ -14,7 +14,9 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/arn"
@@ -246,14 +248,14 @@ func newSession() func(echo.Context) error {
 			return err
 		}
 
-		rawIdToken := token.Extra("id_token").(string)
-		idToken, err := vrf.Verify(ctx, rawIdToken)
+		rawIDToken := token.Extra("id_token").(string)
+		idToken, err := vrf.Verify(ctx, rawIDToken)
 
 		if err != nil {
 			return err
 		}
 
-		var claims Claims
+		claims := new(Claims)
 		err = idToken.Claims(&claims)
 
 		if err != nil {
@@ -277,8 +279,7 @@ func newSession() func(echo.Context) error {
 			return err
 		}
 
-		var schema Schema
-
+		schema := new(Schema)
 		err = json.Unmarshal(resp.CustomSchemas["AmazonWebService"], &schema)
 
 		if err != nil {
@@ -304,14 +305,16 @@ func newSession() func(echo.Context) error {
 
 		var data struct {
 			RolesByAccount RolesByAccount
-			Email          string
 			IDToken        string
+			Email          string
 			CSRFToken      string
+			Duration       int64
 		}
 
 		data.RolesByAccount = rolesByAccount
+		data.IDToken = rawIDToken
 		data.Email = claims.Email
-		data.IDToken = rawIdToken
+		data.Duration = int64(idToken.Expiry.Sub(time.Now()).Seconds())
 		data.CSRFToken = c.Get(middleware.DefaultCSRFConfig.ContextKey).(string)
 
 		return c.Render(200, "new_session.html", data)
@@ -330,10 +333,16 @@ func createSession() func(echo.Context) error {
 
 		stsSrv := sts.New(aws_session.Must(aws_session.NewSession()))
 
+		dur, err := strconv.ParseInt(params.Get("duration"), 10, 64)
+
+		if err != nil {
+			return err
+		}
+
 		stsResp, err := stsSrv.AssumeRoleWithWebIdentity(&sts.AssumeRoleWithWebIdentityInput{
 			RoleArn:          aws.String(params.Get("role")),
 			RoleSessionName:  aws.String(params.Get("email")),
-			DurationSeconds:  aws.Int64(3600),
+			DurationSeconds:  aws.Int64(dur),
 			WebIdentityToken: aws.String(params.Get("idToken")),
 		})
 
