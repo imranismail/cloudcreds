@@ -2,9 +2,9 @@
 
 I built a thing to securely access your organization's AWS accounts for both programmatic and console use-case via federated identity.
 
-✅ Credentials are short-lived
-✅ Fine-grained RBAC (google connector)
-✅ Easy deployment
+- ✅ Credentials are short-lived
+- ✅ Fine-grained RBAC (google connector)
+- ✅ Easy deployment
 
 Demo 👇
 
