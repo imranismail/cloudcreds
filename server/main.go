@@ -4,15 +4,16 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -22,6 +23,7 @@ import (
 	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/imranismail/cloudcreds/server/session"
+	"github.com/imranismail/cloudcreds/utils"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	"github.com/spf13/viper"
@@ -55,8 +57,8 @@ type RolesByAccount map[string][]arn.ARN
 type Config struct {
 	ClientID     string   `mapstructure:"client_id"`
 	ClientSecret string   `mapstructure:"client_secret"`
-	Port         string   `mapstructure:"port"`
-	Host         string   `mapstructure:"host"`
+	Port         int      `mapstructure:"port"`
+	URL          string   `mapstructure:"url"`
 	HostedDomain string   `mapstructure:"hosted_domain"`
 	Scopes       []string `mapstructure:"scopes"`
 	IssuerURL    string   `mapstructure:"issuer_url"`
@@ -65,11 +67,7 @@ type Config struct {
 }
 
 func (c *Config) Addr() string {
-	return fmt.Sprintf("%v:%v", c.Host, c.Port)
-}
-
-func (c *Config) URL() string {
-	return fmt.Sprintf("http://%v:%v", c.Host, c.Port)
+	return fmt.Sprintf(":%v", c.Port)
 }
 
 var cfg *Config
@@ -78,16 +76,14 @@ var oa *oauth2.Config
 var ctx context.Context
 
 func init() {
-	gob.Register([]arn.ARN{})
-
-	ctx = context.TODO()
+	ctx = context.Background()
 
 	replacer := strings.NewReplacer(".", "_")
-	viper.SetConfigName("config")
+	viper.SetConfigName("server")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 	viper.SetEnvKeyReplacer(replacer)
-	viper.SetDefault("port", "1337")
+	viper.SetDefault("port", 1337)
 	viper.SetDefault("host", "127.0.0.1")
 	viper.SetDefault("debug", false)
 	viper.SetDefault("session_key", "please-set-this-to-a-high-entropy-string")
@@ -97,20 +93,28 @@ func init() {
 	err := viper.Unmarshal(&cfg)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 
 	provider, err := oidc.NewProvider(ctx, cfg.IssuerURL)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
+
+	parsedURL, err := url.Parse(cfg.URL)
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	parsedURL.Path = path.Join(parsedURL.Path, "/callback")
 
 	oa = &oauth2.Config{
 		ClientID:     cfg.ClientID,
 		ClientSecret: cfg.ClientSecret,
 		Scopes:       cfg.Scopes,
-		RedirectURL:  "http://127.0.0.1:1337/callback",
+		RedirectURL:  parsedURL.String(),
 		Endpoint:     provider.Endpoint(),
 	}
 
@@ -122,6 +126,7 @@ func init() {
 func main() {
 	e := echo.New()
 	e.Debug = cfg.Debug
+	e.HTTPErrorHandler = utils.HTTPErrorHandler
 	e.Renderer = &TemplateRenderer{
 		templates: template.Must(template.ParseGlob("server/templates/*.html")),
 	}
@@ -132,7 +137,7 @@ func main() {
 		TokenLookup: "form:csrf",
 	}))
 
-	e.GET("/", home())
+	e.GET("/", start())
 	e.GET("/callback", callback())
 	e.GET("/session/new", newSession())
 	e.POST("/session", createSession())
@@ -156,7 +161,7 @@ func secureRandString(s int) (string, error) {
 	return base64.URLEncoding.EncodeToString(b), err
 }
 
-func home() func(echo.Context) error {
+func start() func(echo.Context) error {
 	return func(c echo.Context) error {
 		sess, _ := session.Get("default", c)
 		sess.Options = &sessions.Options{
@@ -170,17 +175,34 @@ func home() func(echo.Context) error {
 			return err
 		}
 
+		rawRedirectURI := c.QueryParam("redirect_uri")
 		sess.Values["state"] = state
+
+		if rawRedirectURI != "" {
+			redirectURI, err := url.Parse(rawRedirectURI)
+
+			if err != nil {
+				return err
+			}
+
+			ipAddr := net.ParseIP(redirectURI.Hostname())
+
+			if !ipAddr.IsLoopback() {
+				return echo.NewHTTPError(http.StatusBadRequest, "redirect_url: only loopback ip address are allowed as host")
+			}
+		}
+
+		sess.Values["redirectURI"] = rawRedirectURI
 		sess.Save(c.Request(), c.Response())
 
-		redirectURL := oa.AuthCodeURL(
+		redirectURI := oa.AuthCodeURL(
 			state,
 			oauth2.AccessTypeOnline,
 			oauth2.SetAuthURLParam("prompt", "select_account"),
 			oauth2.SetAuthURLParam("hd", cfg.HostedDomain),
 		)
 
-		return c.Redirect(http.StatusFound, redirectURL)
+		return c.Redirect(http.StatusFound, redirectURI)
 	}
 }
 
@@ -199,15 +221,15 @@ func callback() func(echo.Context) error {
 			return echo.NewHTTPError(http.StatusTeapot, "CSRF prevented because of invalid state")
 		}
 
-		redirectURL, err := url.Parse("/session/new")
+		redirectURI, err := url.Parse("/session/new")
 
 		if err != nil {
 			return err
 		}
 
-		redirectURL.RawQuery = c.QueryParams().Encode()
+		redirectURI.RawQuery = c.QueryParams().Encode()
 
-		return c.Redirect(302, redirectURL.String())
+		return c.Redirect(302, redirectURI.String())
 	}
 }
 
@@ -298,6 +320,12 @@ func newSession() func(echo.Context) error {
 
 func createSession() func(echo.Context) error {
 	return func(c echo.Context) error {
+		sess, _ := session.Get("default", c)
+		sess.Options = &sessions.Options{
+			Path:     "/",
+			HttpOnly: true,
+		}
+
 		params, _ := c.FormParams()
 
 		stsSrv := sts.New(aws_session.Must(aws_session.NewSession()))
@@ -313,6 +341,32 @@ func createSession() func(echo.Context) error {
 			return echo.NewHTTPError(http.StatusUnauthorized, err)
 		}
 
+		rawRedirectURI := sess.Values["redirectURI"]
+
+		if rawRedirectURI != "" {
+			redirectURI, err := url.Parse(rawRedirectURI.(string))
+
+			if err != nil {
+				return err
+			}
+
+			q := redirectURI.Query()
+
+			rawCreds := fmt.Sprintf("%v:%v:%v",
+				*stsResp.Credentials.AccessKeyId,
+				*stsResp.Credentials.SecretAccessKey,
+				*stsResp.Credentials.SessionToken,
+			)
+
+			base64Creds := base64.URLEncoding.EncodeToString([]byte(rawCreds))
+
+			q.Set("credentials", base64Creds)
+
+			redirectURI.RawQuery = q.Encode()
+
+			return c.Redirect(http.StatusFound, redirectURI.String())
+		}
+
 		creds, err := json.Marshal(map[string]string{
 			"sessionId":    *stsResp.Credentials.AccessKeyId,
 			"sessionKey":   *stsResp.Credentials.SecretAccessKey,
@@ -323,20 +377,20 @@ func createSession() func(echo.Context) error {
 			return err
 		}
 
-		fedURL, err := url.Parse("https://signin.aws.amazon.com/federation")
+		redirectURI, err := url.Parse("https://signin.aws.amazon.com/federation")
 
 		if err != nil {
 			return err
 		}
 
-		fedQs := make(url.Values)
-		fedQs.Set("Action", "getSigninToken")
-		fedQs.Set("SessionDuration", "3600")
-		fedQs.Set("Session", string(creds))
+		q := redirectURI.Query()
+		q.Set("Action", "getSigninToken")
+		q.Set("SessionDuration", "3600")
+		q.Set("Session", string(creds))
 
-		fedURL.RawQuery = fedQs.Encode()
+		redirectURI.RawQuery = q.Encode()
 
-		fedRespRaw, err := http.Get(fedURL.String())
+		fedRespRaw, err := http.Get(redirectURI.String())
 
 		if err != nil {
 			return err
@@ -362,47 +416,15 @@ func createSession() func(echo.Context) error {
 			return err
 		}
 
-		redirectQs := make(url.Values)
-		redirectQs.Set("Action", "login")
-		redirectQs.Set("Issuer", cfg.Host)
-		redirectQs.Set("Destination", "https://console.aws.amazon.com")
-		redirectQs.Set("SigninToken", fedResp.SigninToken)
+		redirectURI.RawQuery = ""
+		q = redirectURI.Query()
+		q.Set("Action", "login")
+		q.Set("Issuer", cfg.URL)
+		q.Set("Destination", "https://console.aws.amazon.com")
+		q.Set("SigninToken", fedResp.SigninToken)
 
-		fedURL.RawQuery = redirectQs.Encode()
+		redirectURI.RawQuery = q.Encode()
 
-		return c.Redirect(302, fedURL.String())
-		// fmt.Printf("AWS_ACCESS_KEY_ID=%v\n", *stsResp.Credentials.AccessKeyId)
-		// fmt.Printf("AWS_SECRET_ACCESS_KEY=%v\n", *stsResp.Credentials.SecretAccessKey)
-		// fmt.Printf("AWS_SESSION_TOKEN=%v\n", *stsResp.Credentials.SessionToken)
-
-		// cancelCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-
-		// defer c.Echo().Shutdown(cancelCtx)
-		// defer cancel()
-
-		// return c.Render(http.StatusOK, "message.html", map[string]interface{}{
-		// 	"message": "Role assumed, please close this window and check your terminal output",
-		// 	"context": "success",
-		// 	"color":   "green",
-		// })
-
-		// sess, _ := session.Get("_cloudcreds", c)
-		// sess.Options = &sessions.Options{
-		// 	Path:     "/",
-		// 	MaxAge:   0,
-		// 	HttpOnly: true,
-		// }
-
-		// schema := sess.Values["roles"]
-		// email := sess.Values["email"]
-		// idToken := sess.Values["idToken"]
-
-		// fmt.Println(schema)
-		// fmt.Println(email)
-		// fmt.Println(idToken)
-
-		// return c.Render(200, "roles.html", map[string]interface{}{
-		// 	"schema": schema,
-		// })
+		return c.Redirect(302, redirectURI.String())
 	}
 }
