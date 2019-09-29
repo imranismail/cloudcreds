@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -67,6 +68,10 @@ type State struct {
 type NewSessionData struct {
 	RolesByAccount RolesByAccount
 	StateData      string
+}
+
+type FedResp struct {
+	SigninToken string
 }
 
 type Config struct {
@@ -157,7 +162,7 @@ func main() {
 
 func start() func(echo.Context) error {
 	return func(c echo.Context) error {
-		sess, _ := session.Get("default", c)
+		sess, _ := session.Get("_cloudcreds", c)
 		sess.Options = &sessions.Options{
 			Path:     "/",
 			HttpOnly: true,
@@ -197,7 +202,7 @@ func start() func(echo.Context) error {
 
 func callback() func(echo.Context) error {
 	return func(c echo.Context) error {
-		sess, _ := session.Get("default", c)
+		sess, _ := session.Get("_cloudcreds", c)
 		sess.Options = &sessions.Options{
 			Path:     "/",
 			HttpOnly: true,
@@ -224,7 +229,7 @@ func callback() func(echo.Context) error {
 
 func newSession() func(echo.Context) error {
 	return func(c echo.Context) error {
-		sess, _ := session.Get("default", c)
+		sess, _ := session.Get("_cloudcreds", c)
 		sess.Options = &sessions.Options{
 			Path:     "/",
 			HttpOnly: true,
@@ -292,10 +297,6 @@ func newSession() func(echo.Context) error {
 			rolesByAccount[res.AccountID] = append(rolesByAccount[res.AccountID], res)
 		}
 
-		if err != nil {
-			return err
-		}
-
 		state := new(State)
 		state.RolesByAccount = rolesByAccount
 		state.IDToken = rawIDToken
@@ -322,7 +323,7 @@ func newSession() func(echo.Context) error {
 
 func createSession() func(echo.Context) error {
 	return func(c echo.Context) error {
-		sess, _ := session.Get("default", c)
+		sess, _ := session.Get("_cloudcreds", c)
 		sess.Options = &sessions.Options{
 			Path:     "/",
 			HttpOnly: true,
@@ -410,20 +411,22 @@ func createSession() func(echo.Context) error {
 				return err
 			}
 
-			redirectURI, err := url.Parse("https://signin.aws.amazon.com/federation")
+			fedURI, err := url.Parse("https://signin.aws.amazon.com/federation")
 
 			if err != nil {
 				return err
 			}
 
-			q := redirectURI.Query()
+			fmt.Println(state.Duration)
+
+			q := fedURI.Query()
 			q.Set("Action", "getSigninToken")
-			q.Set("SessionDuration", "3600")
+			q.Set("SessionDuration", strconv.FormatInt(state.Duration, 10))
 			q.Set("Session", string(creds))
 
-			redirectURI.RawQuery = q.Encode()
+			fedURI.RawQuery = q.Encode()
 
-			fedRespRaw, err := http.Get(redirectURI.String())
+			fedRespRaw, err := http.Get(fedURI.String())
 
 			if err != nil {
 				return err
@@ -435,10 +438,7 @@ func createSession() func(echo.Context) error {
 				return err
 			}
 
-			var fedResp struct {
-				SigninToken string `json:"SigninToken"`
-			}
-
+			fedResp := new(FedResp)
 			err = json.Unmarshal(fedRespBody, &fedResp)
 
 			if err != nil {
@@ -449,17 +449,17 @@ func createSession() func(echo.Context) error {
 				return err
 			}
 
-			redirectURI.RawQuery = ""
+			fedURI.RawQuery = ""
 
-			q = redirectURI.Query()
+			q = fedURI.Query()
 			q.Set("Action", "login")
 			q.Set("Issuer", cfg.URL)
-			q.Set("Destination", "https://console.aws.amazon.com")
+			q.Set("Destination", "https://console.aws.amazon.com/")
 			q.Set("SigninToken", fedResp.SigninToken)
 
-			redirectURI.RawQuery = q.Encode()
+			fedURI.RawQuery = q.Encode()
 
-			return c.Redirect(302, redirectURI.String())
+			return c.Redirect(302, fedURI.String())
 		}
 	}
 }
