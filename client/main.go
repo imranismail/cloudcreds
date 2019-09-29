@@ -44,11 +44,10 @@ func (c *Config) Addr() string {
 }
 
 func init() {
-	replacer := strings.NewReplacer(".", "_")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.SetConfigName("client")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
-	viper.SetEnvKeyReplacer(replacer)
+	viper.AddConfigPath("./.cloudcreds")
 	viper.SetDefault("debug", false)
 	viper.ReadInConfig()
 	viper.AutomaticEnv()

@@ -1,0 +1,6 @@
+# Debug flag
+debug: true
+# Local URL to host and open the temporary client-server to initiate auth with cloudcreds server
+url: "http://127.0.0.1:1338"
+# cloudcreds server URL
+server_url: "http://127.0.0.1:1337"
