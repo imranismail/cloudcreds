@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"html/template"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -18,14 +16,6 @@ import (
 )
 
 var cfg *Config
-
-type TemplateRenderer struct {
-	templates *template.Template
-}
-
-func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
-	return t.templates.ExecuteTemplate(w, name, data)
-}
 
 type Config struct {
 	Debug     bool   `mapstructure:"debug"`
@@ -62,14 +52,10 @@ func init() {
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	e := echo.New()
+	e := utils.NewEcho("client")
 	e.HideBanner = true
 	e.HidePort = true
 	e.Debug = cfg.Debug
-	e.HTTPErrorHandler = utils.HTTPErrorHandler
-	e.Renderer = &TemplateRenderer{
-		templates: template.Must(template.ParseGlob("client/templates/*.html")),
-	}
 
 	serverURL, err := url.Parse(cfg.ServerURL)
 

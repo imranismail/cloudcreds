@@ -2,12 +2,9 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"html/template"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -33,14 +30,6 @@ import (
 	admin "google.golang.org/api/admin/directory/v1"
 )
 
-type TemplateRenderer struct {
-	templates *template.Template
-}
-
-func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
-	return t.templates.ExecuteTemplate(w, name, data)
-}
-
 type Role struct {
 	Value string `json:"value"`
 }
@@ -54,6 +43,18 @@ type Claims struct {
 }
 
 type RolesByAccount map[string][]arn.ARN
+
+func (rba *RolesByAccount) Has(arnString string) bool {
+	for _, arns := range *rba {
+		for _, arn := range arns {
+			if arn.String() == arnString {
+				return true
+			}
+		}
+	}
+
+	return false
+}
 
 type State struct {
 	RolesByAccount RolesByAccount
@@ -140,12 +141,8 @@ func init() {
 }
 
 func main() {
-	e := echo.New()
+	e := utils.NewEcho("server")
 	e.Debug = cfg.Debug
-	e.HTTPErrorHandler = utils.HTTPErrorHandler
-	e.Renderer = &TemplateRenderer{
-		templates: template.Must(template.ParseGlob("server/templates/*.html")),
-	}
 
 	e.Use(middleware.Logger())
 	e.Use(session.Middleware(sessions.NewCookieStore([]byte(cfg.SessionKey))))
@@ -158,17 +155,6 @@ func main() {
 	e.Logger.Fatal(e.Start(cfg.Addr()))
 }
 
-func secureRandString(s int) string {
-	b := make([]byte, s)
-	_, err := rand.Read(b)
-
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	return base64.URLEncoding.EncodeToString(b)
-}
-
 func start() func(echo.Context) error {
 	return func(c echo.Context) error {
 		sess, _ := session.Get("default", c)
@@ -177,7 +163,7 @@ func start() func(echo.Context) error {
 			HttpOnly: true,
 		}
 
-		state := secureRandString(32)
+		state := utils.SecureRandString(32)
 		rawRedirectURI := c.QueryParam("redirect_uri")
 		sess.Values["state"] = state
 
@@ -315,7 +301,7 @@ func newSession() func(echo.Context) error {
 		state.IDToken = rawIDToken
 		state.Email = claims.Email
 		state.Duration = int64(idToken.Expiry.Sub(time.Now()).Seconds())
-		state.CSRFToken = secureRandString(32)
+		state.CSRFToken = utils.SecureRandString(32)
 
 		b, err := json.Marshal(state)
 
@@ -369,22 +355,8 @@ func createSession() func(echo.Context) error {
 		}
 
 		role := params.Get("role")
-		found := false
 
-		for _, v := range state.RolesByAccount {
-			if found == true {
-				break
-			}
-
-			for _, vv := range v {
-				if vv.String() == role {
-					found = true
-					break
-				}
-			}
-		}
-
-		if !found {
+		if !state.RolesByAccount.Has(role) {
 			return echo.NewHTTPError(http.StatusTeapot, "You're not allowed to assume the selected role")
 		}
 
