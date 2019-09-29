@@ -418,7 +418,7 @@ func createSession() func(echo.Context) error {
 
 			base64Creds := base64.URLEncoding.EncodeToString([]byte(rawCreds))
 
-			q.Set("credentials", base64Creds)
+			q.Set("cloudcreds", base64Creds)
 
 			redirectURI.RawQuery = q.Encode()
 

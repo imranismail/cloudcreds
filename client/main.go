@@ -92,7 +92,7 @@ func main() {
 	e.GET("/", func(c echo.Context) error {
 		defer cancel()
 
-		rawCreds := c.QueryParam("credentials")
+		rawCreds := c.QueryParam("cloudcreds")
 		rawByte, err := base64.URLEncoding.DecodeString(rawCreds)
 
 		if err != nil {
