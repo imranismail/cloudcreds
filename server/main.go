@@ -376,6 +376,7 @@ func createSession() func(echo.Context) error {
 		rawRedirectURI := sess.Values["redirectURI"]
 
 		if rawRedirectURI != "" {
+			// redirect to client
 			redirectURI, err := url.Parse(rawRedirectURI.(string))
 
 			if err != nil {
@@ -397,66 +398,67 @@ func createSession() func(echo.Context) error {
 			redirectURI.RawQuery = q.Encode()
 
 			return c.Redirect(http.StatusFound, redirectURI.String())
+		} else {
+			// redirect to console
+			creds, err := json.Marshal(map[string]string{
+				"sessionId":    *stsResp.Credentials.AccessKeyId,
+				"sessionKey":   *stsResp.Credentials.SecretAccessKey,
+				"sessionToken": *stsResp.Credentials.SessionToken,
+			})
+
+			if err != nil {
+				return err
+			}
+
+			redirectURI, err := url.Parse("https://signin.aws.amazon.com/federation")
+
+			if err != nil {
+				return err
+			}
+
+			q := redirectURI.Query()
+			q.Set("Action", "getSigninToken")
+			q.Set("SessionDuration", "3600")
+			q.Set("Session", string(creds))
+
+			redirectURI.RawQuery = q.Encode()
+
+			fedRespRaw, err := http.Get(redirectURI.String())
+
+			if err != nil {
+				return err
+			}
+
+			fedRespBody, err := ioutil.ReadAll(fedRespRaw.Body)
+
+			if err != nil {
+				return err
+			}
+
+			var fedResp struct {
+				SigninToken string `json:"SigninToken"`
+			}
+
+			err = json.Unmarshal(fedRespBody, &fedResp)
+
+			if err != nil {
+				return err
+			}
+
+			if err != nil {
+				return err
+			}
+
+			redirectURI.RawQuery = ""
+			q = redirectURI.Query()
+			q.Set("Action", "login")
+			q.Set("Issuer", cfg.URL)
+			q.Set("Destination", "https://console.aws.amazon.com")
+			q.Set("SigninToken", fedResp.SigninToken)
+
+			redirectURI.RawQuery = q.Encode()
+
+			return c.Redirect(302, redirectURI.String())
 		}
-
-		creds, err := json.Marshal(map[string]string{
-			"sessionId":    *stsResp.Credentials.AccessKeyId,
-			"sessionKey":   *stsResp.Credentials.SecretAccessKey,
-			"sessionToken": *stsResp.Credentials.SessionToken,
-		})
-
-		if err != nil {
-			return err
-		}
-
-		redirectURI, err := url.Parse("https://signin.aws.amazon.com/federation")
-
-		if err != nil {
-			return err
-		}
-
-		q := redirectURI.Query()
-		q.Set("Action", "getSigninToken")
-		q.Set("SessionDuration", "3600")
-		q.Set("Session", string(creds))
-
-		redirectURI.RawQuery = q.Encode()
-
-		fedRespRaw, err := http.Get(redirectURI.String())
-
-		if err != nil {
-			return err
-		}
-
-		fedRespBody, err := ioutil.ReadAll(fedRespRaw.Body)
-
-		if err != nil {
-			return err
-		}
-
-		var fedResp struct {
-			SigninToken string `json:"SigninToken"`
-		}
-
-		err = json.Unmarshal(fedRespBody, &fedResp)
-
-		if err != nil {
-			return err
-		}
-
-		if err != nil {
-			return err
-		}
-
-		redirectURI.RawQuery = ""
-		q = redirectURI.Query()
-		q.Set("Action", "login")
-		q.Set("Issuer", cfg.URL)
-		q.Set("Destination", "https://console.aws.amazon.com")
-		q.Set("SigninToken", fedResp.SigninToken)
-
-		redirectURI.RawQuery = q.Encode()
-
-		return c.Redirect(302, redirectURI.String())
 	}
 }
