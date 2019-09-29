@@ -7,10 +7,7 @@
     <main class="flex justify-center">
       <form method="post" action="/session" class="bg-white shadow-md rounded px-8 pt-6 pb-8 m-0 mt-24">
         <span class="font-extrabold text-gray-700 text-center block mb-6 text-xl">Amazon Web Service</span>
-        <input type="hidden" name="csrf" value="{{ .CSRFToken }}">
-        <input type="hidden" name="email" value="{{ .Email }}">
-        <input type="hidden" name="duration" value="{{ .Duration }}">
-        <input type="hidden" name="idToken" value="{{ .IDToken }}">
+        <input type="hidden" name="state" value="{{ .StateData }}">
         <div class="mb-4">
           <span class="font-normal text-gray-500 text-sm w-full">Select IAM Role</span>
           <div class="inline-block relative w-full">

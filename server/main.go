@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"strconv"
 	"strings"
 	"time"
 
@@ -55,6 +54,19 @@ type Claims struct {
 }
 
 type RolesByAccount map[string][]arn.ARN
+
+type State struct {
+	RolesByAccount RolesByAccount
+	IDToken        string
+	CSRFToken      string
+	Email          string
+	Duration       int64
+}
+
+type NewSessionData struct {
+	RolesByAccount RolesByAccount
+	StateData      string
+}
 
 type Config struct {
 	ClientID     string   `mapstructure:"client_id"`
@@ -135,9 +147,6 @@ func main() {
 
 	e.Use(middleware.Logger())
 	e.Use(session.Middleware(sessions.NewCookieStore([]byte(cfg.SessionKey))))
-	e.Use(middleware.CSRFWithConfig(middleware.CSRFConfig{
-		TokenLookup: "form:csrf",
-	}))
 
 	e.GET("/", start())
 	e.GET("/callback", callback())
@@ -147,20 +156,15 @@ func main() {
 	e.Logger.Fatal(e.Start(cfg.Addr()))
 }
 
-func genRandBytes(n int) ([]byte, error) {
-	b := make([]byte, n)
+func secureRandString(s int) string {
+	b := make([]byte, s)
 	_, err := rand.Read(b)
 
 	if err != nil {
-		return nil, err
+		log.Fatalln(err)
 	}
 
-	return b, nil
-}
-
-func secureRandString(s int) (string, error) {
-	b, err := genRandBytes(s)
-	return base64.URLEncoding.EncodeToString(b), err
+	return base64.URLEncoding.EncodeToString(b)
 }
 
 func start() func(echo.Context) error {
@@ -171,12 +175,7 @@ func start() func(echo.Context) error {
 			HttpOnly: true,
 		}
 
-		state, err := secureRandString(32)
-
-		if err != nil {
-			return err
-		}
-
+		state := secureRandString(32)
 		rawRedirectURI := c.QueryParam("redirect_uri")
 		sess.Values["state"] = state
 
@@ -216,11 +215,11 @@ func callback() func(echo.Context) error {
 			HttpOnly: true,
 		}
 
-		remoteState := c.QueryParam("state")
-		localState := sess.Values["state"]
+		paramState := c.QueryParam("state")
+		sessState := sess.Values["state"]
 
-		if localState != remoteState {
-			return echo.NewHTTPError(http.StatusTeapot, "CSRF prevented because of invalid state")
+		if paramState != sessState {
+			return echo.NewHTTPError(http.StatusTeapot, "I'm a teapot")
 		}
 
 		redirectURI, err := url.Parse("/session/new")
@@ -237,6 +236,12 @@ func callback() func(echo.Context) error {
 
 func newSession() func(echo.Context) error {
 	return func(c echo.Context) error {
+		sess, _ := session.Get("default", c)
+		sess.Options = &sessions.Options{
+			Path:     "/",
+			HttpOnly: true,
+		}
+
 		paramCode := c.QueryParam("code")
 
 		token, err := oa.Exchange(
@@ -303,19 +308,25 @@ func newSession() func(echo.Context) error {
 			return err
 		}
 
-		var data struct {
-			RolesByAccount RolesByAccount
-			IDToken        string
-			Email          string
-			CSRFToken      string
-			Duration       int64
+		state := new(State)
+		state.RolesByAccount = rolesByAccount
+		state.IDToken = rawIDToken
+		state.Email = claims.Email
+		state.Duration = int64(idToken.Expiry.Sub(time.Now()).Seconds())
+		state.CSRFToken = secureRandString(32)
+
+		b, err := json.Marshal(state)
+
+		if err != nil {
+			return err
 		}
 
+		data := new(NewSessionData)
 		data.RolesByAccount = rolesByAccount
-		data.IDToken = rawIDToken
-		data.Email = claims.Email
-		data.Duration = int64(idToken.Expiry.Sub(time.Now()).Seconds())
-		data.CSRFToken = c.Get(middleware.DefaultCSRFConfig.ContextKey).(string)
+		data.StateData = base64.StdEncoding.EncodeToString(b)
+
+		sess.Values["state"] = data.StateData
+		sess.Save(c.Request(), c.Response())
 
 		return c.Render(200, "new_session.html", data)
 	}
@@ -329,21 +340,59 @@ func createSession() func(echo.Context) error {
 			HttpOnly: true,
 		}
 
-		params, _ := c.FormParams()
-
-		stsSrv := sts.New(aws_session.Must(aws_session.NewSession()))
-
-		dur, err := strconv.ParseInt(params.Get("duration"), 10, 64)
+		params, err := c.FormParams()
 
 		if err != nil {
 			return err
 		}
 
+		paramState := params.Get("state")
+		sessState := sess.Values["state"]
+
+		if paramState != sessState {
+			return echo.NewHTTPError(http.StatusTeapot, "I'm a teapot")
+		}
+
+		b, err := base64.StdEncoding.DecodeString(paramState)
+
+		if err != nil {
+			return err
+		}
+
+		state := new(State)
+		err = json.Unmarshal(b, state)
+
+		if err != nil {
+			return err
+		}
+
+		role := params.Get("role")
+		found := false
+
+		for _, v := range state.RolesByAccount {
+			if found == true {
+				break
+			}
+
+			for _, vv := range v {
+				if vv.String() == role {
+					found = true
+					break
+				}
+			}
+		}
+
+		if !found {
+			return echo.NewHTTPError(http.StatusTeapot, "You're not allowed to assume the selected role")
+		}
+
+		stsSrv := sts.New(aws_session.Must(aws_session.NewSession()))
+
 		stsResp, err := stsSrv.AssumeRoleWithWebIdentity(&sts.AssumeRoleWithWebIdentityInput{
 			RoleArn:          aws.String(params.Get("role")),
-			RoleSessionName:  aws.String(params.Get("email")),
-			DurationSeconds:  aws.Int64(dur),
-			WebIdentityToken: aws.String(params.Get("idToken")),
+			RoleSessionName:  aws.String(state.Email),
+			DurationSeconds:  aws.Int64(state.Duration),
+			WebIdentityToken: aws.String(state.IDToken),
 		})
 
 		if err != nil {

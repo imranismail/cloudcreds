@@ -90,6 +90,8 @@ func main() {
 	}
 
 	e.GET("/", func(c echo.Context) error {
+		defer cancel()
+
 		rawCreds := c.QueryParam("credentials")
 		rawByte, err := base64.URLEncoding.DecodeString(rawCreds)
 
@@ -107,10 +109,8 @@ func main() {
 		fmt.Printf("AWS_SECRET_ACCESS_KEY=%v\n", creds[1])
 		fmt.Printf("AWS_SESSION_TOKEN=%v\n", creds[2])
 
-		defer cancel()
-
 		return c.Render(http.StatusOK, "message.html", map[string]interface{}{
-			"message": "Successfully logged in, you may export the output in the CLI",
+			"message": "You may now close this window and use the temporary credentials",
 			"context": "Success",
 			"color":   "green",
 		})
