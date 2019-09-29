@@ -450,6 +450,7 @@ func createSession() func(echo.Context) error {
 			}
 
 			redirectURI.RawQuery = ""
+
 			q = redirectURI.Query()
 			q.Set("Action", "login")
 			q.Set("Issuer", cfg.URL)
