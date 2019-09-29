@@ -72,7 +72,7 @@ type Config struct {
 	ClientID     string   `mapstructure:"client_id"`
 	ClientSecret string   `mapstructure:"client_secret"`
 	Port         int      `mapstructure:"port"`
-	Host         string   `mapstructure:"host"`
+	Hostname     string   `mapstructure:"hostname"`
 	URL          string   `mapstructure:"url"`
 	HostedDomain string   `mapstructure:"hosted_domain"`
 	Scopes       []string `mapstructure:"scopes"`
@@ -82,7 +82,7 @@ type Config struct {
 }
 
 func (c *Config) Addr() string {
-	return fmt.Sprintf("%s:%d", c.Host, c.Port)
+	return fmt.Sprintf("%s:%d", c.Hostname, c.Port)
 }
 
 var cfg *Config
@@ -98,7 +98,8 @@ func init() {
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("./.cloudcreds")
 	viper.SetDefault("port", 1337)
-	viper.SetDefault("host", "127.0.0.1")
+	viper.SetDefault("hostname", "127.0.0.1")
+	viper.SetDefault("url", "http://127.0.0.1:1337")
 	viper.SetDefault("debug", false)
 	viper.SetDefault("session_key", "please-set-this-to-a-high-entropy-string")
 	viper.SetDefault("hosted_domain", "*")

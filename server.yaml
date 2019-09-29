@@ -3,7 +3,7 @@ debug: true
 # public URL of the server
 url: "https://cloudcreds.internal.acme.com"
 # hostname to be bind
-host: "127.0.0.1"
+hostname: "127.0.0.1"
 # port to be bind
 port: 1337
 # key used to encrypt cookie session
