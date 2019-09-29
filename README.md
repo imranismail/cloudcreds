@@ -2,7 +2,7 @@
 
 Secure access to your organization's AWS accounts for both programmatic and console use-case via federated identity
 
-- ✅ Credentials are short-lived
+- ✅ Credentials are short-lived (Min: 1h, Max: 12h)
 - ✅ Fine-grained RBAC (via [Google Admin CustomSchemas](https://developers.google.com/admin-sdk/directory/v1/guides/manage-schemas))
 - ✅ Easy deployment (via docker, kustomize and executables)
 
