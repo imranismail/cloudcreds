@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/imranismail/cloudcreds/utils"
-	"github.com/labstack/echo"
+	"github.com/labstack/echo/v4"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/viper"
 )

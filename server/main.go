@@ -21,10 +21,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
-	"github.com/imranismail/cloudcreds/server/session"
 	"github.com/imranismail/cloudcreds/utils"
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo-contrib/session"
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
 
