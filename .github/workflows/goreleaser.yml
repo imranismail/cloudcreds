@@ -1,7 +1,6 @@
 name: goreleaser
 
 on:
-  pull_request:
   push:
 
 jobs:
@@ -10,16 +9,13 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@master
-    -
-      name: Set up Go
+
+    - name: Set up Go
       uses: actions/setup-go@master
       with:
         go-version: 1.13.x
-    -
-      name: Run GoReleaser
+
+    - name: Run GoReleaser
       uses: goreleaser/goreleaser-action@v1
       with:
-        args: release --rm-dist
-        key: ${{ secrets.CLOUDCREDS_PRIVATE_KEY }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        args: release
