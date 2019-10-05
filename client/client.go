@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/imranismail/cloudcreds/templates"
 	"github.com/imranismail/cloudcreds/utils"
 	"github.com/labstack/echo/v4"
 	"github.com/skratchdot/open-golang/open"
@@ -36,7 +37,7 @@ func Console() {
 func Login() {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	cli := utils.NewEcho("client")
+	cli := utils.NewEcho()
 	cli.HideBanner = true
 	cli.HidePort = true
 	cli.Debug = viper.GetBool("debug")
@@ -78,11 +79,13 @@ func Login() {
 		fmt.Printf("AWS_SECRET_ACCESS_KEY=%v\n", creds[1])
 		fmt.Printf("AWS_SESSION_TOKEN=%v\n", creds[2])
 
-		return c.Render(http.StatusOK, "message.html", map[string]interface{}{
-			"message": "You may now close this window and use the temporary credentials",
-			"context": "Success",
-			"color":   "green",
-		})
+		msg := templates.Message{
+			Content: "You may now close this window and use the temporary credentials",
+			Context: "Success",
+			Color:   "green",
+		}
+
+		return c.HTML(http.StatusOK, msg.Render())
 	})
 
 	go func() {

@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
+	"github.com/imranismail/cloudcreds/templates"
 	"github.com/imranismail/cloudcreds/utils"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
@@ -43,31 +44,12 @@ type Claims struct {
 	Email string `json:"email"`
 }
 
-type RolesByAccount map[string][]arn.ARN
-
-func (rba *RolesByAccount) Has(arnString string) bool {
-	for _, arns := range *rba {
-		for _, arn := range arns {
-			if arn.String() == arnString {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
 type State struct {
-	RolesByAccount RolesByAccount
+	RolesByAccount templates.RolesByAccount
 	IDToken        string
 	CSRFToken      string
 	Email          string
 	Duration       int64
-}
-
-type NewSessionData struct {
-	RolesByAccount RolesByAccount
-	StateData      string
 }
 
 type FedResp struct {
@@ -113,7 +95,7 @@ func Init() {
 }
 
 func Serve() {
-	srv := utils.NewEcho("server")
+	srv := utils.NewEcho()
 	srv.Debug = viper.GetBool("server.debug")
 
 	srv.Use(middleware.Logger())
@@ -251,7 +233,7 @@ func handleNewSession() func(echo.Context) error {
 			return err
 		}
 
-		rolesByAccount := make(RolesByAccount)
+		rolesByAccount := make(templates.RolesByAccount)
 
 		for _, v := range schema.Roles {
 			rawArn := strings.Split(v.Value, ",")[0]
@@ -271,20 +253,18 @@ func handleNewSession() func(echo.Context) error {
 		state.Duration = int64(idToken.Expiry.Sub(time.Now()).Seconds())
 		state.CSRFToken = utils.SecureRandString(32)
 
-		b, err := json.Marshal(state)
+		stateBytes, err := json.Marshal(state)
 
 		if err != nil {
 			return err
 		}
 
-		data := new(NewSessionData)
-		data.RolesByAccount = rolesByAccount
-		data.StateData = base64.StdEncoding.EncodeToString(b)
+		stateData := base64.StdEncoding.EncodeToString(stateBytes)
 
-		sess.Values["state"] = data.StateData
+		sess.Values["state"] = stateData
 		sess.Save(c.Request(), c.Response())
 
-		return c.Render(200, "new_session.html", data)
+		return c.HTML(http.StatusOK, templates.NewSession(&rolesByAccount, stateData))
 	}
 }
 

@@ -4,22 +4,16 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"text/template"
 
+	"github.com/imranismail/cloudcreds/templates"
 	"github.com/labstack/echo/v4"
 )
 
-func NewEcho(serverType string) *echo.Echo {
-	tplGlob := fmt.Sprintf("%s/templates/*.html", serverType)
-
+func NewEcho() *echo.Echo {
 	e := echo.New()
 	e.HTTPErrorHandler = httpErrorHandler
-	e.Renderer = &templateRenderer{
-		templates: template.Must(template.ParseGlob(tplGlob)),
-	}
 
 	return e
 }
@@ -42,19 +36,13 @@ func httpErrorHandler(err error, c echo.Context) {
 		code = he.Code
 	}
 
-	c.Render(code, "message.html", map[string]interface{}{
-		"message": fmt.Sprintf("an error occurred: %v", err),
-		"context": "Error",
-		"color":   "red",
-	})
+	msg := templates.Message{
+		Content: fmt.Sprintf("an error occurred: %v", err),
+		Context: "Error",
+		Color:   "red",
+	}
+
+	c.HTML(code, msg.Render())
 
 	c.Logger().Error(err)
-}
-
-type templateRenderer struct {
-	templates *template.Template
-}
-
-func (t *templateRenderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
-	return t.templates.ExecuteTemplate(w, name, data)
 }

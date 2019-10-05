@@ -1,0 +1,25 @@
+{% code 
+type Message struct {
+  Content string
+  Context string
+  Color string
+}
+%}
+{% func (msg *Message) Render() %}
+<html>
+  <head>
+    <title>Cloudcreds | {%s msg.Context %}</title>
+    <link href="https://unpkg.com/tailwindcss@^1.0/dist/tailwind.min.css" rel="stylesheet">
+  </head>
+  <body class="bg-gray-200">
+    <main class="flex justify-center">
+      <div class="text-center mt-12">
+        <div class="p-2 bg-{%s msg.Color %}-800 items-center text-{%s msg.Color %}-100 leading-none lg:rounded-full flex lg:inline-flex" role="alert">
+          <span class="flex rounded-full bg-{%s msg.Color %}-500 uppercase px-2 py-1 text-xs font-bold mr-3">{%s msg.Context %}</span>
+          <span class="font-semibold mr-2 text-left flex-auto">{%s msg.Content %}</span>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
+{% endfunc %}
