@@ -26,6 +26,9 @@ changelog:
     exclude:
     - '^docs:'
     - '^test:'
-docker:
+dockers:
 - image_templates:
-  - imranismail/cloudcreds
+  - "imranismail/cloudcreds:latest"
+  - "imranismail/cloudcreds:{{ .Tag }}"
+  - "imranismail/cloudcreds:{{ .Tag }}-{{ .Env.GO_VERSION }}"
+  - "imranismail/cloudcreds:v{{ .Major }}"
