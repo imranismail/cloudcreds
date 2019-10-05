@@ -29,7 +29,7 @@ import (
 // loginCmd represents the login command
 var loginCmd = &cobra.Command{
 	Use:   "login",
-	Short: "Outputs AWS credentials to upon successful login",
+	Short: "Get a short-lived AWS credentials",
 	Long: `You may use this auto-export your short-lived AWS credentials like so:
 
   export $(cloudcreds login | xargs)
