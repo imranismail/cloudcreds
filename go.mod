@@ -6,7 +6,6 @@ require (
 	github.com/aws/aws-sdk-go v1.24.5
 	github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/gorilla/sessions v1.2.0
-	github.com/labstack/echo v3.3.10+incompatible
 	github.com/labstack/echo-contrib v0.6.0
 	github.com/labstack/echo/v4 v4.1.10
 	github.com/mitchellh/go-homedir v1.1.0
