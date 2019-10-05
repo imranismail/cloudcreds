@@ -31,7 +31,12 @@ server:
   port: 1337
   # key used to encrypt cookie session
   session_key: please-set-this-to-a-high-entropy-string
-  # oauth credentials
+  # oauth credentials, you can follow along this tutorial to generate them:
+  # make sure to set your:
+  # - authorized domain
+  # - default scopes
+  # - whitelisted callback
+  # https://support.google.com/cloud/answer/6158849?hl=en
   client_id: "<google-oauth-client-id>"
   client_secret: "<google-oauth-client-secret>"
   # supports only google for now
