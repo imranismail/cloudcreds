@@ -16,15 +16,11 @@ Demo 👇
 
 Create a Google Oauth Client by following this tutorial: https://support.google.com/cloud/answer/6158849?hl=en
 
-Make sure it's an internal app usable only by your hosted domain, i.e: Emails with hosted domain pointing to "acme.com".
+Make sure it's an internal app usable only by your hosted domain, i.e: Emails with domain pointing to "acme.com".
 
 Also, generate a client credential and whitelist the following redirect URI which will be pointing to the cloudcreds server.
 
 `https://$CLOUDCREDS_SERVER_URL/callback`
-
-or
-
-`https://cloudcreds.acme.com/callback`
 
 
 ### Create an IAM Role for Web Identity
@@ -69,9 +65,9 @@ If you're using docker or any container based platform you may do so like this:
 
 ```bash
 docker run \
-  -e CLOUDCREDS_SERVER_URL=https://cloudcreds.acme.com \
   -e CLOUDCREDS_SERVER_CLIENT_ID=<google-oauth-client-id> \
   -e CLOUDCREDS_SERVER_CLIENT_SECRET=<google-oauth-client-secret> \
+  -e CLOUDCREDS_SERVER_HOSTED_DOMAIN=acme.com \
   imranismail/cloudcreds:v1 serve
 ```
 
@@ -79,35 +75,9 @@ If you want to test this out locally. Create a file in `~/.cloudcreds.yaml` with
 
 ```yaml
 server:
-  # debug flag
-  debug: true
-  # public URL of the server
-  url: "https://cloudcreds.internal.acme.com"
-  # hostname to be bind
-  hostname: "127.0.0.1"
-  # port to be bind
-  port: 1337
-  # key used to encrypt cookie session
-  session_key: please-set-this-to-a-high-entropy-string
-  # oauth credentials, you can follow along this tutorial to generate them:
-  # make sure to set your:
-  # - authorized domain
-  # - default scopes
-  # - whitelisted callback
-  # https://support.google.com/cloud/answer/6158849?hl=en
   client_id: "<google-oauth-client-id>"
   client_secret: "<google-oauth-client-secret>"
-  # supports only google for now
-  # future plans includes github, auth0 and other oidc adapters
-  issuer_url: "https://accounts.google.com"
-  # your organization hosted domain e.g: youremail@hosted_domain.com
-  hosted_domain: "*"
-  # these are the default scopes needed
-  scopes:
-  - email
-  - profile
-  - openid
-  - https://www.googleapis.com/auth/admin.directory.user.readonly
+  hosted_domain: "acme.com"
 ```
 
 Run `cloudcreds serve` to fire up a local server
@@ -118,11 +88,7 @@ Create a file in `~/.cloudcreds.yaml` with the following content:
 
 ```yaml
 client:
-  # Debug flag
-  debug: true
-  # Local URL to host and open the temporary client-server to initiate auth with cloudcreds server
   url: "http://127.0.0.1:1338"
-  # cloudcreds server URL
   server_url: "http://127.0.0.1:1337"
 ```
 
@@ -147,14 +113,14 @@ Assuming a role will either output the credentials to your CLI or redirect you t
 ```yaml
 client:
   # Debug flag
-  debug: true
+  debug: false
   # Local URL to host and open the temporary client-server to initiate auth with cloudcreds server
   url: "http://127.0.0.1:1338"
   # cloudcreds server URL
   server_url: "http://127.0.0.1:1337"
 server:
   # debug flag
-  debug: true
+  debug: false
   # public URL of the server
   url: "https://cloudcreds.internal.acme.com"
   # hostname to be bind
