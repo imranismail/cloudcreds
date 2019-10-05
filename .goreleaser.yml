@@ -28,7 +28,8 @@ release:
   draft: true
   prerelease: auto
 dockers:
-- image_templates:
+- skip_push: false
+  image_templates:
   - "imranismail/cloudcreds:latest"
   - "imranismail/cloudcreds:{{ .Tag }}"
   - "imranismail/cloudcreds:v{{ .Major }}"
