@@ -53,11 +53,13 @@ Create an IAM role on AWS with any permissions you'd like to grant this role. Ne
 
 ### Attach IAM Roles to GSuite Users
 
-![aws](./docs/images/aws-custom-attributes.png)
-
 Follow this tutorial to create a custom attribute for your users: https://support.google.com/a/answer/6208725?hl=en
 
-Once that's done, attach any IAM role with the correct trust policy like so:
+Category has to be named as `Amazon Web Service`
+
+![aws](./docs/images/aws-custom-attributes.png)
+
+Once that's done, attach any IAM role that has the correct trust policy attached to it:
 
 ![adding-attribs](./docs/images/adding-custom-attributes.png)
 
@@ -107,6 +109,8 @@ server:
   - openid
   - https://www.googleapis.com/auth/admin.directory.user.readonly
 ```
+
+Run `cloudcreds serve` to fire up a local server
 
 ### Assume A Role
 
