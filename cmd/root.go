@@ -106,11 +106,9 @@ func initConfig() {
 	viper.SetDefault("server.issuer_url", "https://accounts.google.com")
 	viper.SetDefault("server.scopes", []string{"email", "profile", "openid", "https://www.googleapis.com/auth/admin.directory.user.readonly"})
 
-	viper.AutomaticEnv() // read in environment variables that match
+	// read in environment variables that match
+	viper.AutomaticEnv()
 
 	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	viper.ReadInConfig()
 }
