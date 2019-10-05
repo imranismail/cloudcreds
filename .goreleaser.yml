@@ -25,11 +25,9 @@ release:
   github:
     owner: imranismail
     name: cloudcreds
-  draft: true
   prerelease: auto
 dockers:
-- skip_push: false
-  image_templates:
+- image_templates:
   - "imranismail/cloudcreds:latest"
   - "imranismail/cloudcreds:{{ .Tag }}"
   - "imranismail/cloudcreds:v{{ .Major }}"
