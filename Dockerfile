@@ -1,13 +1,5 @@
-FROM golang:1.13
+FROM scratch
 
-WORKDIR /go/src/github.com/imranismail/cloudcreds
+COPY cloudcreds /
 
-COPY . .
-
-RUN go install
-
-FROM golang:1.13
-
-COPY --from=0 /go/bin/cloudcreds /go/bin
-
-CMD ["cloudcreds"]
+ENTRYPOINT ["/cloudcreds"]
