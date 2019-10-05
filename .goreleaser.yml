@@ -31,3 +31,4 @@ dockers:
   - "imranismail/cloudcreds:latest"
   - "imranismail/cloudcreds:{{ .Tag }}"
   - "imranismail/cloudcreds:v{{ .Major }}"
+  - "imranismail/cloudcreds:v{{ .Major }}.{{ .Minor }}"
