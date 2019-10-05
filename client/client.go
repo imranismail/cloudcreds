@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"context"
@@ -33,48 +33,48 @@ func (c *Config) Addr() string {
 	return fmt.Sprintf("%v:%v", clientURL.Hostname(), clientURL.Port())
 }
 
-func init() {
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	viper.SetConfigName("client")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath("./.cloudcreds")
-	viper.SetDefault("debug", false)
-	viper.ReadInConfig()
-	viper.AutomaticEnv()
-
-	err := viper.Unmarshal(&cfg)
+func Init() {
+	err := viper.UnmarshalKey("client", &cfg)
 
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func main() {
+func Console() {
+	err := open.Run(cfg.ServerURL)
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func Login() {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	e := utils.NewEcho("client")
-	e.HideBanner = true
-	e.HidePort = true
-	e.Debug = cfg.Debug
+	cli := utils.NewEcho("client")
+	cli.HideBanner = true
+	cli.HidePort = true
+	cli.Debug = cfg.Debug
 
-	serverURL, err := url.Parse(cfg.ServerURL)
-
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	q := serverURL.Query()
-	q.Set("redirect_uri", cfg.URL)
-
-	serverURL.RawQuery = q.Encode()
-
-	err = open.Run(serverURL.String())
+	srvURL, err := url.Parse(cfg.ServerURL)
 
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	e.GET("/", func(c echo.Context) error {
+	qry := srvURL.Query()
+	qry.Set("redirect_uri", cfg.URL)
+
+	srvURL.RawQuery = qry.Encode()
+
+	err = open.Run(srvURL.String())
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	cli.GET("/", func(c echo.Context) error {
 		defer cancel()
 
 		rawCreds := c.QueryParam("cloudcreds")
@@ -102,9 +102,9 @@ func main() {
 	})
 
 	go func() {
-		e.Start(cfg.Addr())
+		cli.Start(cfg.Addr())
 	}()
 	<-ctx.Done()
 
-	e.Shutdown(ctx)
+	cli.Shutdown(ctx)
 }

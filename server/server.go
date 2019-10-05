@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -22,9 +22,9 @@ import (
 	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/imranismail/cloudcreds/utils"
+	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/labstack/echo-contrib/session"
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
 
@@ -96,23 +96,10 @@ var vrf *oidc.IDTokenVerifier
 var oa *oauth2.Config
 var ctx context.Context
 
-func init() {
+func Init() {
 	ctx = context.Background()
 
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	viper.SetConfigName("server")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath("./.cloudcreds")
-	viper.SetDefault("port", 1337)
-	viper.SetDefault("hostname", "127.0.0.1")
-	viper.SetDefault("url", "http://127.0.0.1:1337")
-	viper.SetDefault("debug", false)
-	viper.SetDefault("session_key", "please-set-this-to-a-high-entropy-string")
-	viper.SetDefault("hosted_domain", "*")
-	viper.ReadInConfig()
-	viper.AutomaticEnv()
-
-	err := viper.Unmarshal(&cfg)
+	err := viper.UnmarshalKey("server", &cfg)
 
 	if err != nil {
 		log.Fatalln(err)
@@ -145,22 +132,22 @@ func init() {
 	})
 }
 
-func main() {
-	e := utils.NewEcho("server")
-	e.Debug = cfg.Debug
+func Serve() {
+	srv := utils.NewEcho("server")
+	srv.Debug = cfg.Debug
 
-	e.Use(middleware.Logger())
-	e.Use(session.Middleware(sessions.NewCookieStore([]byte(cfg.SessionKey))))
+	srv.Use(middleware.Logger())
+	srv.Use(session.Middleware(sessions.NewCookieStore([]byte(cfg.SessionKey))))
 
-	e.GET("/", start())
-	e.GET("/callback", callback())
-	e.GET("/session/new", newSession())
-	e.POST("/session", createSession())
+	srv.GET("/", handleStart())
+	srv.GET("/callback", handleCallback())
+	srv.GET("/session/new", handleNewSession())
+	srv.POST("/session", handleCreateSession())
 
-	e.Logger.Fatal(e.Start(cfg.Addr()))
+	srv.Logger.Fatal(srv.Start(cfg.Addr()))
 }
 
-func start() func(echo.Context) error {
+func handleStart() func(echo.Context) error {
 	return func(c echo.Context) error {
 		sess, _ := session.Get("_cloudcreds", c)
 		sess.Options = &sessions.Options{
@@ -200,7 +187,7 @@ func start() func(echo.Context) error {
 	}
 }
 
-func callback() func(echo.Context) error {
+func handleCallback() func(echo.Context) error {
 	return func(c echo.Context) error {
 		sess, _ := session.Get("_cloudcreds", c)
 		sess.Options = &sessions.Options{
@@ -227,7 +214,7 @@ func callback() func(echo.Context) error {
 	}
 }
 
-func newSession() func(echo.Context) error {
+func handleNewSession() func(echo.Context) error {
 	return func(c echo.Context) error {
 		sess, _ := session.Get("_cloudcreds", c)
 		sess.Options = &sessions.Options{
@@ -321,7 +308,7 @@ func newSession() func(echo.Context) error {
 	}
 }
 
-func createSession() func(echo.Context) error {
+func handleCreateSession() func(echo.Context) error {
 	return func(c echo.Context) error {
 		sess, _ := session.Get("_cloudcreds", c)
 		sess.Options = &sessions.Options{
