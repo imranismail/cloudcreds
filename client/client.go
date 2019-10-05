@@ -15,16 +15,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-var cfg *Config
-
-type Config struct {
-	Debug     bool   `mapstructure:"debug"`
-	URL       string `mapstructure:"url"`
-	ServerURL string `mapstructure:"server_url"`
-}
-
-func (c *Config) Addr() string {
-	clientURL, err := url.Parse(c.URL)
+func serverAdr() string {
+	clientURL, err := url.Parse(viper.GetString("client.url"))
 
 	if err != nil {
 		log.Fatalln(err)
@@ -33,16 +25,8 @@ func (c *Config) Addr() string {
 	return fmt.Sprintf("%v:%v", clientURL.Hostname(), clientURL.Port())
 }
 
-func Init() {
-	err := viper.UnmarshalKey("client", &cfg)
-
-	if err != nil {
-		log.Fatalln(err)
-	}
-}
-
 func Console() {
-	err := open.Run(cfg.ServerURL)
+	err := open.Run(viper.GetString("client.server_url"))
 
 	if err != nil {
 		log.Fatalln(err)
@@ -55,16 +39,16 @@ func Login() {
 	cli := utils.NewEcho("client")
 	cli.HideBanner = true
 	cli.HidePort = true
-	cli.Debug = cfg.Debug
+	cli.Debug = viper.GetBool("debug")
 
-	srvURL, err := url.Parse(cfg.ServerURL)
+	srvURL, err := url.Parse(viper.GetString("client.server_url"))
 
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	qry := srvURL.Query()
-	qry.Set("redirect_uri", cfg.URL)
+	qry.Set("redirect_uri", viper.GetString("client.url"))
 
 	srvURL.RawQuery = qry.Encode()
 
@@ -102,7 +86,7 @@ func Login() {
 	})
 
 	go func() {
-		cli.Start(cfg.Addr())
+		cli.Start(serverAdr())
 	}()
 	<-ctx.Done()
 

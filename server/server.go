@@ -74,24 +74,10 @@ type FedResp struct {
 	SigninToken string
 }
 
-type Config struct {
-	ClientID     string   `mapstructure:"client_id"`
-	ClientSecret string   `mapstructure:"client_secret"`
-	Port         int      `mapstructure:"port"`
-	Hostname     string   `mapstructure:"hostname"`
-	URL          string   `mapstructure:"url"`
-	HostedDomain string   `mapstructure:"hosted_domain"`
-	Scopes       []string `mapstructure:"scopes"`
-	IssuerURL    string   `mapstructure:"issuer_url"`
-	Debug        bool     `mapstructure:"debug"`
-	SessionKey   string   `mapstructure:"session_key"`
+func serverAddr() string {
+	return fmt.Sprintf("%s:%d", viper.GetString("server.hostname"), viper.GetInt("server.port"))
 }
 
-func (c *Config) Addr() string {
-	return fmt.Sprintf("%s:%d", c.Hostname, c.Port)
-}
-
-var cfg *Config
 var vrf *oidc.IDTokenVerifier
 var oa *oauth2.Config
 var ctx context.Context
@@ -99,19 +85,13 @@ var ctx context.Context
 func Init() {
 	ctx = context.Background()
 
-	err := viper.UnmarshalKey("server", &cfg)
+	provider, err := oidc.NewProvider(ctx, viper.GetString("server.issuer_url"))
 
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	provider, err := oidc.NewProvider(ctx, cfg.IssuerURL)
-
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	parsedURL, err := url.Parse(cfg.URL)
+	parsedURL, err := url.Parse(viper.GetString("server.url"))
 
 	if err != nil {
 		log.Fatalln(err)
@@ -120,9 +100,9 @@ func Init() {
 	parsedURL.Path = path.Join(parsedURL.Path, "/callback")
 
 	oa = &oauth2.Config{
-		ClientID:     cfg.ClientID,
-		ClientSecret: cfg.ClientSecret,
-		Scopes:       cfg.Scopes,
+		ClientID:     viper.GetString("server.client_id"),
+		ClientSecret: viper.GetString("server.client_secret"),
+		Scopes:       viper.GetStringSlice("server.scopes"),
 		RedirectURL:  parsedURL.String(),
 		Endpoint:     provider.Endpoint(),
 	}
@@ -134,17 +114,17 @@ func Init() {
 
 func Serve() {
 	srv := utils.NewEcho("server")
-	srv.Debug = cfg.Debug
+	srv.Debug = viper.GetBool("server.debug")
 
 	srv.Use(middleware.Logger())
-	srv.Use(session.Middleware(sessions.NewCookieStore([]byte(cfg.SessionKey))))
+	srv.Use(session.Middleware(sessions.NewCookieStore([]byte(viper.GetString("server.session_key")))))
 
 	srv.GET("/", handleStart())
 	srv.GET("/callback", handleCallback())
 	srv.GET("/session/new", handleNewSession())
 	srv.POST("/session", handleCreateSession())
 
-	srv.Logger.Fatal(srv.Start(cfg.Addr()))
+	srv.Logger.Fatal(srv.Start(serverAddr()))
 }
 
 func handleStart() func(echo.Context) error {
@@ -180,7 +160,7 @@ func handleStart() func(echo.Context) error {
 			state,
 			oauth2.AccessTypeOnline,
 			oauth2.SetAuthURLParam("prompt", "select_account"),
-			oauth2.SetAuthURLParam("hd", cfg.HostedDomain),
+			oauth2.SetAuthURLParam("hd", viper.GetString("server.hosted_domain")),
 		)
 
 		return c.Redirect(http.StatusFound, redirectURI)
@@ -440,7 +420,7 @@ func handleCreateSession() func(echo.Context) error {
 
 			q = fedURI.Query()
 			q.Set("Action", "login")
-			q.Set("Issuer", cfg.URL)
+			q.Set("Issuer", viper.GetString("server.url"))
 			q.Set("Destination", "https://console.aws.amazon.com/")
 			q.Set("SigninToken", fedResp.SigninToken)
 

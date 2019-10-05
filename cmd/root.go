@@ -70,6 +70,7 @@ func init() {
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.SetEnvPrefix("cloudcreds")
 
 	if cfgFile != "" {
 		// Use config file from the flag.
@@ -87,8 +88,10 @@ func initConfig() {
 		viper.SetConfigName(".cloudcreds")
 	}
 
+	// Set global config default value
+	viper.SetDefault("debug", false)
+
 	// Set client default value
-	viper.SetDefault("client.debug", false)
 	viper.SetDefault("client.url", "http://127.0.0.1:1338")
 	viper.SetDefault("client.server_url", "http://127.0.0.1:1337")
 
@@ -96,9 +99,12 @@ func initConfig() {
 	viper.SetDefault("server.port", 1337)
 	viper.SetDefault("server.hostname", "127.0.0.1")
 	viper.SetDefault("server.url", "http://127.0.0.1:1337")
-	viper.SetDefault("server.debug", false)
-	viper.SetDefault("server.session_key", "please-set-this-to-a-high-entropy-string")
+	viper.SetDefault("server.client_id", "<google-oauth-client-id>")
+	viper.SetDefault("server.client_secret", "<google-oauth-client-secret>")
+	viper.SetDefault("server.session_key", "a-high-entropy-string")
 	viper.SetDefault("server.hosted_domain", "*")
+	viper.SetDefault("server.issuer_url", "https://accounts.google.com")
+	viper.SetDefault("server.scopes", []string{"email", "profile", "openid", "https://www.googleapis.com/auth/admin.directory.user.readonly"})
 
 	viper.AutomaticEnv() // read in environment variables that match
 

@@ -32,7 +32,6 @@ var consoleCmd = &cobra.Command{
 	Short: "Get a short-lived session to AWS console",
 	Long:  `Use this to access AWS console via a federated identity broker server`,
 	Run: func(cmd *cobra.Command, args []string) {
-		client.Init()
 		client.Console()
 	},
 }

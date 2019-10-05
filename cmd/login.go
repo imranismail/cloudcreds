@@ -35,7 +35,6 @@ var loginCmd = &cobra.Command{
   export $(cloudcreds login | xargs)
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		client.Init()
 		client.Login()
 	},
 }
