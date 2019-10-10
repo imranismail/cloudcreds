@@ -99,12 +99,11 @@ func initConfig() {
 	viper.SetDefault("server.port", 1337)
 	viper.SetDefault("server.hostname", "127.0.0.1")
 	viper.SetDefault("server.url", "http://127.0.0.1:1337")
-	viper.SetDefault("server.client_id", "<google-oauth-client-id>")
-	viper.SetDefault("server.client_secret", "<google-oauth-client-secret>")
 	viper.SetDefault("server.session_key", "a-high-entropy-string")
-	viper.SetDefault("server.hosted_domain", "*")
-	viper.SetDefault("server.issuer_url", "https://accounts.google.com")
-	viper.SetDefault("server.scopes", []string{"email", "profile", "openid", "https://www.googleapis.com/auth/admin.directory.user.readonly"})
+	viper.SetDefault("server.hosted_domain", "example.com")
+	viper.SetDefault("server.admin_email", "admin@example.com")
+	viper.SetDefault("server.service_account_key", "{}")
+	viper.SetDefault("server.client_credentials", "{}")
 
 	// read in environment variables that match
 	viper.AutomaticEnv()

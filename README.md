@@ -135,7 +135,7 @@ server:
   # https://developers.google.com/admin-sdk/directory/v1/guides/delegation
   service_account_key: |
     {}
-  hosted_domain: "*"
+  hosted_domain: "acme.com"
 ```
 
 ### Environment Variables
