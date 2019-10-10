@@ -30,13 +30,13 @@ server:
   # you can follow along this tutorial to generate them:
   # https://support.google.com/cloud/answer/6158849
   client_credentials: |
-    {}
+    {...client-credentials.json}
   # service account credentials 
   # this is needed to fetch to permitted role for a user to assumed
   # you can follow along this tutorial to generate them:
   # https://developers.google.com/admin-sdk/directory/v1/guides/delegation
   service_account_key: |
-    {}
+    {...service-account-key.json}
   # public URL of the server
   url: "https://cloudcreds.internal.acme.com"
   # hostname to be bind
@@ -52,17 +52,18 @@ server:
 
 ### Create an OAuth Client
 
-Create a Google Oauth Client by following this tutorial: https://support.google.com/cloud/answer/6158849?hl=en
+Create a Google Oauth Client by following this guide: https://support.google.com/cloud/answer/6158849?hl=en
 
-Make sure it's an internal app usable only by your hosted domain, i.e: Emails with domain pointing to "acme.com".
-
-Also, generate a client credential and whitelist the following redirect URI which will be pointing to the cloudcreds server.
-
-`https://$CLOUDCREDS_SERVER_URL/callback`
+- Make sure it's an internal app usable only by your hosted domain, i.e: Emails with domain pointing to "acme.com".
+- Whitelist this url pattern: `https://$CLOUDCREDS_SERVER_URL/callback`
+- Generate a client credential and download the json file
 
 ### Create a Service Account
 
-Create a Google Service account to be able to get user's assigned role in gsuite: https://developers.google.com/admin-sdk/directory/v1/guides/delegation
+Create a Google Service account to be able to get user's assigned role in gsuite by following this guide: https://developers.google.com/admin-sdk/directory/v1/guides/delegation
+
+- Make sure you've attached the `https://www.googleapis.com/auth/admin.directory.user.readonly` scope to the service account in gsuite settings
+- Download the service account key json file
 
 ### Create an IAM Role for Web Identity
 
@@ -117,9 +118,9 @@ If you want to test this out locally. Create a file in `~/.cloudcreds.yaml` with
 ```yaml
 server:
   client_credentials: |
-    <google-oauth-client-id>
+    {...client-credentials.json}
   service_account_key: |
-    <service-account-key.json>
+    {...service-account-key.json}
   hosted_domain: "acme.com"
 ```
 
