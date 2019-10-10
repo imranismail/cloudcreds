@@ -126,7 +126,7 @@ server:
 
 Run `cloudcreds serve` to fire up a local server
 
-### Assume A Role
+### Setup Client
 
 Create a file in `~/.cloudcreds.yaml` with the following content:
 
@@ -135,6 +135,8 @@ client:
   url: "http://127.0.0.1:1338"
   server_url: "http://127.0.0.1:1337"
 ```
+
+### Assuming Role
 
 Then you can use one of the following commands to access AWS
 
