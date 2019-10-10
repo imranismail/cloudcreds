@@ -28,8 +28,10 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 
 	admin "google.golang.org/api/admin/directory/v1"
+	option "google.golang.org/api/option"
 )
 
 type Role struct {
@@ -63,15 +65,14 @@ func serverAddr() string {
 var vrf *oidc.IDTokenVerifier
 var oa *oauth2.Config
 var ctx context.Context
+var adminSvc *admin.Service
+var stsSvc *sts.STS
+var iss = "https://accounts.google.com"
 
 func Init() {
 	ctx = context.Background()
 
-	provider, err := oidc.NewProvider(ctx, viper.GetString("server.issuer_url"))
-
-	if err != nil {
-		log.Fatalln(err)
-	}
+	stsSvc = sts.New(aws_session.Must(aws_session.NewSession()))
 
 	parsedURL, err := url.Parse(viper.GetString("server.url"))
 
@@ -81,12 +82,43 @@ func Init() {
 
 	parsedURL.Path = path.Join(parsedURL.Path, "/callback")
 
-	oa = &oauth2.Config{
-		ClientID:     viper.GetString("server.client_id"),
-		ClientSecret: viper.GetString("server.client_secret"),
-		Scopes:       viper.GetStringSlice("server.scopes"),
-		RedirectURL:  parsedURL.String(),
-		Endpoint:     provider.Endpoint(),
+	oa, err = google.ConfigFromJSON(
+		[]byte(viper.GetString("server.client_credentials")),
+		"openid",
+		"email",
+		"profile",
+	)
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	cfg, err := google.JWTConfigFromJSON(
+		[]byte(viper.GetString("server.service_account_key")),
+		admin.AdminDirectoryUserReadonlyScope,
+	)
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	cfg.Subject = viper.GetString("server.admin_email")
+
+	ts := cfg.TokenSource(ctx)
+
+	adminSvc, err = admin.NewService(
+		ctx,
+		option.WithTokenSource(ts),
+	)
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	provider, err := oidc.NewProvider(ctx, iss)
+
+	if err != nil {
+		log.Fatalln(err)
 	}
 
 	vrf = provider.Verifier(&oidc.Config{
@@ -96,7 +128,7 @@ func Init() {
 
 func Serve() {
 	srv := utils.NewEcho()
-	srv.Debug = viper.GetBool("server.debug")
+	srv.Debug = viper.GetBool("debug")
 
 	srv.Use(middleware.Logger())
 	srv.Use(session.Middleware(sessions.NewCookieStore([]byte(viper.GetString("server.session_key")))))
@@ -209,45 +241,7 @@ func handleNewSession() func(echo.Context) error {
 			return err
 		}
 
-		srv, err := admin.New(oa.Client(ctx, token))
-
-		if err != nil {
-			return err
-		}
-
-		resp, err := srv.Users.
-			Get(claims.Email).
-			CustomFieldMask("AmazonWebService").
-			Projection("custom").
-			Fields("customSchemas").
-			Do()
-
-		if err != nil {
-			return err
-		}
-
-		schema := new(Schema)
-		err = json.Unmarshal(resp.CustomSchemas["AmazonWebService"], &schema)
-
-		if err != nil {
-			return err
-		}
-
-		rolesByAccount := make(templates.RolesByAccount)
-
-		for _, v := range schema.Roles {
-			rawArn := strings.Split(v.Value, ",")[0]
-			res, err := arn.Parse(rawArn)
-
-			if err != nil {
-				return err
-			}
-
-			rolesByAccount[res.AccountID] = append(rolesByAccount[res.AccountID], res)
-		}
-
 		state := new(State)
-		state.RolesByAccount = rolesByAccount
 		state.IDToken = rawIDToken
 		state.Email = claims.Email
 		state.Duration = int64(idToken.Expiry.Sub(time.Now()).Seconds())
@@ -263,6 +257,12 @@ func handleNewSession() func(echo.Context) error {
 
 		sess.Values["state"] = stateData
 		sess.Save(c.Request(), c.Response())
+
+		rolesByAccount, err := getRolesByAccount(claims.Email)
+
+		if err != nil {
+			return err
+		}
 
 		return c.HTML(http.StatusOK, templates.NewSession(&rolesByAccount, stateData))
 	}
@@ -304,13 +304,17 @@ func handleCreateSession() func(echo.Context) error {
 
 		role := params.Get("role")
 
-		if !state.RolesByAccount.Has(role) {
+		rolesByAccount, err := getRolesByAccount(state.Email)
+
+		if err != nil {
+			return err
+		}
+
+		if !rolesByAccount.Has(role) {
 			return echo.NewHTTPError(http.StatusTeapot, "You're not allowed to assume the selected role")
 		}
 
-		stsSrv := sts.New(aws_session.Must(aws_session.NewSession()))
-
-		stsResp, err := stsSrv.AssumeRoleWithWebIdentity(&sts.AssumeRoleWithWebIdentityInput{
+		stsResp, err := stsSvc.AssumeRoleWithWebIdentity(&sts.AssumeRoleWithWebIdentityInput{
 			RoleArn:          aws.String(params.Get("role")),
 			RoleSessionName:  aws.String(state.Email),
 			DurationSeconds:  aws.Int64(state.Duration),
@@ -324,7 +328,6 @@ func handleCreateSession() func(echo.Context) error {
 		rawRedirectURI := sess.Values["redirectURI"]
 
 		if rawRedirectURI != "" {
-			// redirect to client
 			redirectURI, err := url.Parse(rawRedirectURI.(string))
 
 			if err != nil {
@@ -347,7 +350,6 @@ func handleCreateSession() func(echo.Context) error {
 
 			return c.Redirect(http.StatusFound, redirectURI.String())
 		} else {
-			// redirect to console
 			creds, err := json.Marshal(map[string]string{
 				"sessionId":    *stsResp.Credentials.AccessKeyId,
 				"sessionKey":   *stsResp.Credentials.SecretAccessKey,
@@ -363,8 +365,6 @@ func handleCreateSession() func(echo.Context) error {
 			if err != nil {
 				return err
 			}
-
-			fmt.Println(state.Duration)
 
 			q := fedURI.Query()
 			q.Set("Action", "getSigninToken")
@@ -409,4 +409,39 @@ func handleCreateSession() func(echo.Context) error {
 			return c.Redirect(302, fedURI.String())
 		}
 	}
+}
+
+func getRolesByAccount(email string) (templates.RolesByAccount, error) {
+	resp, err := adminSvc.Users.
+		Get(email).
+		CustomFieldMask("AmazonWebService").
+		Projection("custom").
+		Fields("customSchemas").
+		Do()
+
+	if err != nil {
+		return nil, err
+	}
+
+	schema := new(Schema)
+	err = json.Unmarshal(resp.CustomSchemas["AmazonWebService"], &schema)
+
+	if err != nil {
+		return nil, err
+	}
+
+	rolesByAccount := make(templates.RolesByAccount)
+
+	for _, v := range schema.Roles {
+		rawArn := strings.Split(v.Value, ",")[0]
+		res, err := arn.Parse(rawArn)
+
+		if err != nil {
+			return nil, err
+		}
+
+		rolesByAccount[res.AccountID] = append(rolesByAccount[res.AccountID], res)
+	}
+
+	return rolesByAccount, nil
 }

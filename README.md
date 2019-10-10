@@ -111,16 +111,14 @@ Assuming a role will either output the credentials to your CLI or redirect you t
 *All values are default*
 
 ```yaml
+# debug flag
+debug: false
 client:
-  # Debug flag
-  debug: false
   # Local URL to host and open the temporary client-server to initiate auth with cloudcreds server
   url: "http://127.0.0.1:1338"
   # cloudcreds server URL
   server_url: "http://127.0.0.1:1337"
 server:
-  # debug flag
-  debug: false
   # public URL of the server
   url: "https://cloudcreds.internal.acme.com"
   # hostname to be bind
@@ -130,28 +128,18 @@ server:
   # key used to encrypt cookie session
   session_key: please-set-this-to-a-high-entropy-string
   # oauth credentials, you can follow along this tutorial to generate them:
-  # make sure to set your:
-  # - authorized domain
-  # - default scopes
-  # - whitelisted callback
-  # https://support.google.com/cloud/answer/6158849?hl=en
-  client_id: "<google-oauth-client-id>"
-  client_secret: "<google-oauth-client-secret>"
-  # supports only google for now
-  # future plans includes github, auth0 and other oidc adapters
-  issuer_url: "https://accounts.google.com"
-  # your organization hosted domain e.g: youremail@hosted_domain.com
+  # https://support.google.com/cloud/answer/6158849
+  client_credentials: |
+    {}
+  # service account credentials, you can follow along this tutorial to generate them:
+  # https://developers.google.com/admin-sdk/directory/v1/guides/delegation
+  service_account_key: |
+    {}
   hosted_domain: "*"
-  # these are the default scopes needed
-  scopes:
-  - email
-  - profile
-  - openid
-  - https://www.googleapis.com/auth/admin.directory.user.readonly
 ```
 
 ### Environment Variables
 
 Any of the configs provided can be overridden using Environment Variables with the following convention:
 
-`CLOUDCREDS_SERVER_SCOPES="email,profile,openid"`
+`CLOUDCREDS_SERVER_HOSTED_DOMAIN="acme.com"`
