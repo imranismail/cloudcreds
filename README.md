@@ -10,6 +10,44 @@ Demo 👇
 
 [![Demo](https://img.youtube.com/vi/onBf6JFj-IU/0.jpg)](https://www.youtube.com/watch?v=onBf6JFj-IU)
 
+## Config Reference
+
+*All values are default*
+
+Can either be stored in `~/.cloudcreds.yaml` or set using env vars `CLOUDCREDS_PATH_TO=value`
+
+```yaml
+# debug flag
+debug: false
+client:
+  # Local URL to host and open the temporary client-server to initiate auth with cloudcreds server
+  url: "http://127.0.0.1:1338"
+  # cloudcreds server URL
+  server_url: "http://127.0.0.1:1337"
+server:
+  # oauth credentials
+  # this is needed to allow a google federated user to assume as AWS IAM role
+  # you can follow along this tutorial to generate them:
+  # https://support.google.com/cloud/answer/6158849
+  client_credentials: |
+    {}
+  # service account credentials 
+  # this is needed to fetch to permitted role for a user to assumed
+  # you can follow along this tutorial to generate them:
+  # https://developers.google.com/admin-sdk/directory/v1/guides/delegation
+  service_account_key: |
+    {}
+  # public URL of the server
+  url: "https://cloudcreds.internal.acme.com"
+  # hostname to be bind
+  hostname: "127.0.0.1"
+  # port to be bind
+  port: 1337
+  # key used to encrypt cookie session
+  session_key: please-set-this-to-a-high-entropy-string
+  hosted_domain: "acme.com"
+```
+
 ## Getting Started
 
 ### Create an OAuth Client
@@ -22,6 +60,9 @@ Also, generate a client credential and whitelist the following redirect URI whic
 
 `https://$CLOUDCREDS_SERVER_URL/callback`
 
+### Create a Service Account
+
+Create a Google Service account to be able to get user's assigned role in gsuite: https://developers.google.com/admin-sdk/directory/v1/guides/delegation
 
 ### Create an IAM Role for Web Identity
 
@@ -65,18 +106,20 @@ If you're using docker or any container based platform you may do so like this:
 
 ```bash
 docker run \
-  -e CLOUDCREDS_SERVER_CLIENT_ID=<google-oauth-client-id> \
-  -e CLOUDCREDS_SERVER_CLIENT_SECRET=<google-oauth-client-secret> \
+  -e CLOUDCREDS_SERVER_CLIENT_CREDENTIALS=<client-credentials-json> \
+  -e CLOUDCREDS_SERVER_SERVICE_ACCOUNT_KEY=<service-account-key.json> \
   -e CLOUDCREDS_SERVER_HOSTED_DOMAIN=acme.com \
-  imranismail/cloudcreds:v1 serve
+  imranismail/cloudcreds:v0 serve
 ```
 
 If you want to test this out locally. Create a file in `~/.cloudcreds.yaml` with the following content
 
 ```yaml
 server:
-  client_id: "<google-oauth-client-id>"
-  client_secret: "<google-oauth-client-secret>"
+  client_credentials: |
+    <google-oauth-client-id>
+  service_account_key: |
+    <service-account-key.json>
   hosted_domain: "acme.com"
 ```
 
@@ -105,41 +148,3 @@ Do the whole OAuth dance and once that's done you will be shown a page to select
 ![assume-role](./docs/images/assume-role.png)
 
 Assuming a role will either output the credentials to your CLI or redirect you to AWS Console
-
-## Full Config Reference
-
-*All values are default*
-
-```yaml
-# debug flag
-debug: false
-client:
-  # Local URL to host and open the temporary client-server to initiate auth with cloudcreds server
-  url: "http://127.0.0.1:1338"
-  # cloudcreds server URL
-  server_url: "http://127.0.0.1:1337"
-server:
-  # public URL of the server
-  url: "https://cloudcreds.internal.acme.com"
-  # hostname to be bind
-  hostname: "127.0.0.1"
-  # port to be bind
-  port: 1337
-  # key used to encrypt cookie session
-  session_key: please-set-this-to-a-high-entropy-string
-  # oauth credentials, you can follow along this tutorial to generate them:
-  # https://support.google.com/cloud/answer/6158849
-  client_credentials: |
-    {}
-  # service account credentials, you can follow along this tutorial to generate them:
-  # https://developers.google.com/admin-sdk/directory/v1/guides/delegation
-  service_account_key: |
-    {}
-  hosted_domain: "acme.com"
-```
-
-### Environment Variables
-
-Any of the configs provided can be overridden using Environment Variables with the following convention:
-
-`CLOUDCREDS_SERVER_HOSTED_DOMAIN="acme.com"`
