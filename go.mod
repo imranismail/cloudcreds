@@ -3,7 +3,7 @@ module github.com/imranismail/cloudcreds
 go 1.13
 
 require (
-	github.com/aws/aws-sdk-go v1.24.5
+	github.com/aws/aws-sdk-go v1.33.0
 	github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/gorilla/sessions v1.2.0
 	github.com/labstack/echo-contrib v0.6.0
